@@ -1,0 +1,13 @@
+Metric,Value
+dataset,Samson
+image_height,95
+image_width,95
+spectral_bands,156
+components,3
+pixels,9025
+MSE_original_units,2960.51611328125
+RMSE_original_units,54.4106250035896
+MAE_original_units,31.649477005004883
+final_scaled_MSE_from_training,0.0029605156742036343
+final_MSE_from_training,2960.515625
+input_scale,1000.0
