@@ -2,7 +2,7 @@
 ## When Can Endmembers Be Recovered?
 
 > **NIT Jamshedpur — CS1503**  
-> **GL:** Miran &nbsp;|&nbsp; **GM:** Sarfaraz, Samran, Irfan, Adnan
+> **GL:** Miran &nbsp;|&nbsp; **GM:** Samran, Irfan, Adnan
 
 ---
 
