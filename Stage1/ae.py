@@ -88,8 +88,9 @@ def run() -> None:
 
     torch.manual_seed(0)
 
-    project_dir = Path(__file__).resolve().parent
-    header_path = find_header(args.data, project_dir)
+    # The script lives in Stage1 while DATASETS is a sibling of Stage1.
+    project_root = Path(__file__).resolve().parent.parent
+    header_path = find_header(args.data, project_root)
     image_path = header_path.with_suffix("")
     if not image_path.is_file():
         raise FileNotFoundError(f"Samson ENVI image not found: {image_path}")

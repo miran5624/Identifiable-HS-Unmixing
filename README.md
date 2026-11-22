@@ -75,10 +75,10 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 
 | Metric | Value |
 |--------|------:|
-| Reconstruction MSE (original units) | **2,960.52** |
-| Reconstruction RMSE | **54.41** |
-| Reconstruction MAE | **31.65** |
-| Final Scaled Training MSE | 0.002961 |
+| Reconstruction MSE (original units) | **2,981.47** |
+| Reconstruction RMSE | **54.60** |
+| Reconstruction MAE | **31.93** |
+| Final Scaled Training MSE | 0.002981 |
 | Mean-Spectrum Baseline MSE | 37,246.12 |
 | **MSE Reduction vs. Baseline** | **92.0%** |
 
@@ -87,11 +87,11 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 | Metric | Value |
 |--------|------:|
 | Mean Spectral Angle to GT Endmembers | **34.26°** |
-| Abundance RMSE vs. Ground Truth | **0.4112** |
-| Mean Abundance Entropy | 0.8111 |
+| Abundance RMSE vs. Ground Truth | **0.3025** |
+| Mean Abundance Entropy | 0.7682 |
 | Max Abundance Sum Error from 1 | 1.79 × 10⁻⁷ |
 
-**Best endmember permutation:** predicted (0, 1, 2) → GT (0, 2, 1), with spectral angles of 15.57°, 45.83°, and 41.38°.
+**Best endmember permutation:** predicted (0, 1, 2) → GT (0, 2, 1), with spectral angles of 15.57°, 45.83°, and 41.38° in predicted-component order. The abundance RMSE uses the visually verified `fortran_to_c` Samson ground-truth layout.
 
 ### Key Takeaway
 
@@ -108,8 +108,7 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 | Training loss curve | `Stage 1 Results/Graphs/training_loss_curve.png` |
 | Scatter plot (original vs. reconstructed) | `Stage 1 Results/Graphs/reconstruction_scatter.png` |
 | Metrics (CSV + JSON) | `Stage 1 Results/Metrics/` |
-| Model checkpoint | `Stage1/m.pt` |
-| Full tensor results | `Stage1/r.pt` |
+| Model outputs | Generated locally (`m.pt`, `r.pt`); not tracked |
 
 ---
 
@@ -129,8 +128,6 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 │   └── SAMSON/                          # Samson ENVI data + reference code
 ├── Stage1/
 │   ├── ae.py                            # Autoencoder training script
-│   ├── m.pt                             # Saved model state dict
-│   ├── r.pt                             # Full tensor results
 │   └── stage1_results.md                # Run summary
 └── Stage 1 Results/
     ├── Abundance Maps/                  # Per-component abundance maps
