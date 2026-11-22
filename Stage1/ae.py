@@ -45,11 +45,9 @@ def find_header(data_path: Path | None, project_dir: Path) -> Path:
             "Pass its location with --data."
         )
     if len(matches) > 1:
-        locations = "
-".join(str(path) for path in matches)
+        locations = "\n".join(str(path) for path in matches)
         raise RuntimeError(
-            "Found more than one Samson header; select one with --data:
-" + locations
+            "Found more than one Samson header; select one with --data:\n" + locations
         )
     return matches[0]
 
