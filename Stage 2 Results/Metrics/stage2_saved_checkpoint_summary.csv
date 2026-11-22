@@ -1,0 +1,3 @@
+init,warmup_epochs,lambda_vol,n_seeds,gt_layout,mean_sad_mean_deg,mean_sad_std_deg,rmse_mean,rmse_std,min_angle_mean_deg,min_angle_min_deg
+random,0,0.0,1,fortran_to_c,8.737939986093155,0.0,0.31139400278561263,0.0,30.996533979127022,30.996533979127022
+random,0,0.001,1,fortran_to_c,8.852672191802853,0.0,0.31150679163207984,0.0,30.10316555370684,30.10316555370684
