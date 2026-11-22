@@ -45,9 +45,11 @@ def find_header(data_path: Path | None, project_dir: Path) -> Path:
             "Pass its location with --data."
         )
     if len(matches) > 1:
-        locations = "\n".join(str(path) for path in matches)
+        locations = "
+".join(str(path) for path in matches)
         raise RuntimeError(
-            "Found more than one Samson header; select one with --data:\n" + locations
+            "Found more than one Samson header; select one with --data:
+" + locations
         )
     return matches[0]
 
@@ -88,8 +90,9 @@ def run() -> None:
 
     torch.manual_seed(0)
 
-    project_dir = Path(__file__).resolve().parent
-    header_path = find_header(args.data, project_dir)
+    # The script lives in Stage1 while DATASETS is a sibling of Stage1.
+    project_root = Path(__file__).resolve().parent.parent
+    header_path = find_header(args.data, project_root)
     image_path = header_path.with_suffix("")
     if not image_path.is_file():
         raise FileNotFoundError(f"Samson ENVI image not found: {image_path}")
