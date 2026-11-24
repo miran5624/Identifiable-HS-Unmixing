@@ -1,4 +1,3 @@
-```markdown
 # Identifiable Hyperspectral Unmixing with Learned Decoders
 ## When Can Endmembers Be Recovered?
 
@@ -25,9 +24,7 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 
 ## Architecture
 
-
 ```
-
 ┌───────────── Encoder ──────────────┐     ┌──── Decoder ────┐
 │ Linear(156 → 78) → ReLU           │     │                 │
 │ Linear(78 → 3)   → Softmax        │ ──► │ Linear(3 → 156) │
@@ -35,11 +32,7 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 │ Output: abundances on the simplex  │     │ Weights = E     │
 └────────────────────────────────────┘     └─────────────────┘
 
-```
-     x ─► Encoder ─► a ─► Decoder ─► x̂ = E·a
-
-```
-
+         x ─► Encoder ─► a ─► Decoder ─► x̂ = E·a
 ```
 
 | Component | Details |
@@ -129,7 +122,7 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 
 Stage 2 adds the **log-det volume penalty** to the autoencoder loss to enforce minimum-volume endmember recovery:
 
-$$\mathcal{L} = \underbrace{\frac{1}{N}\sum_i \|x_i - \hat{E}\,a_i\|^2}_{\text{per-pixel SSE}} + \lambda \cdot \underbrace{\log\det(\hat{E}^\top \hat{E} + \epsilon I)}_{\text{volume term}}$$
+$$\mathcal{L} = \underbrace{\frac{1}{N}\sum_i \Vert{}x_i - \hat{E}\,a_i\Vert{}^2}_{\text{per-pixel SSE}} + \lambda \cdot \underbrace{\log\det(\hat{E}^\top \hat{E} + \epsilon I)}_{\text{volume term}}$$
 
 The decoder weights are clamped non-negative after each gradient step to enforce $\hat{E} \in \mathbb{R}^{B \times p}_+$.
 
@@ -214,9 +207,7 @@ Stage 3 completes the experimental evaluation required for the final paper:
 
 ## Repository Structure
 
-
 ```
-
 ├── README.md
 ├── build_stage_updates.py               # Generates Stage 1 & 2 update outputs
 ├── DATASETS/
@@ -237,8 +228,8 @@ Stage 3 completes the experimental evaluation required for the final paper:
 │   ├── logdet_volume_autoencoder.py     # Stage 2 log-det volume training script
 │   ├── evaluate_samson_unmixing.py      # Ground-truth evaluation (SAD, RMSE, Hungarian matching)
 │   ├── generate_stage2_results.py       # Generates sweep plots & results summary
-│   ├── samson_unmixing_*lambda0.pt     # Control checkpoint (λ=0)
-│   └── samson_unmixing*_lambda0.001.pt # Best log-det checkpoint (λ=0.001)
+│   ├── samson_unmixing_*_lambda0.pt     # Control checkpoint (λ=0)
+│   └── samson_unmixing_*_lambda0.001.pt # Best log-det checkpoint (λ=0.001)
 ├── Stage 2 Update/
 │   ├── Abundance Maps/                  # Per-component abundance maps (log-det model)
 │   ├── Endmember Analysis/              # Learned endmember spectral curves
@@ -248,10 +239,9 @@ Stage 3 completes the experimental evaluation required for the final paper:
 │   ├── Parameter Sweep/                 # SAD vs λ and RMSE vs λ sweep plots
 │   └── summary.md                       # Stage 2 results summary
 └── Stage 2 Results/
-├── Graphs/                          # Ground-truth comparison & sweep plots
-├── Metrics/                         # Evaluation CSVs
-└── stage2_results_summary.md        # Detailed Stage 2 results summary
-
+    ├── Graphs/                          # Ground-truth comparison & sweep plots
+    ├── Metrics/                         # Evaluation CSVs
+    └── stage2_results_summary.md        # Detailed Stage 2 results summary
 ```
 
 ---
@@ -260,23 +250,19 @@ Stage 3 completes the experimental evaluation required for the final paper:
 
 ### Prerequisites
 
-
 ```
-
 Python ≥ 3.9
 PyTorch
 Spectral Python (SPy)
 NumPy
 SciPy
 Matplotlib
-
 ```
 
 ### Installation
 
 ```bash
 pip install torch spectral numpy scipy matplotlib
-
 ```
 
 ### Running Stage 1
@@ -284,14 +270,12 @@ pip install torch spectral numpy scipy matplotlib
 ```bash
 cd Stage1
 python ae.py --epochs 2000 --lr 0.001 --output-dir .
-
 ```
 
 The script auto-discovers `samson_1.img.hdr` under the project tree. To specify manually:
 
 ```bash
 python ae.py --data ../DATASETS/SAMSON/.../samson_1.img.hdr --epochs 2000
-
 ```
 
 **Outputs:** `m.pt` (model checkpoint) and `r.pt` (reconstructions, abundances, endmembers, loss history).
@@ -309,13 +293,12 @@ python logdet_volume_autoencoder.py --lambda-vol 0 --epochs 2000
 
 # With warm-up (200 epochs reconstruction-only before enabling volume penalty)
 python logdet_volume_autoencoder.py --lambda-vol 0.001 --warmup-epochs 200 --epochs 2000
-
 ```
 
 **Key flags:**
 
 | Flag | Default | Description |
-| --- | --- | --- |
+|------|---------|-------------|
 | `--lambda-vol` | 1e-4 | Weight on log-det volume term (0 = control baseline) |
 | `--warmup-epochs` | 0 | Pure-reconstruction epochs before enabling volume penalty |
 | `--init` | `random` | Decoder init: `random` (uniform [0,1]) or `data` (farthest-point) |
@@ -334,18 +317,17 @@ python evaluate_samson_unmixing.py \
 
 # Generate comparison plots
 python generate_stage2_results.py
-
 ```
 
 ---
 
 ## Roadmap
 
-* [x] **Stage 1** — Autoencoder baseline (reconstruction loss only)
-* [x] **Stage 2** — Log-det volume regulariser for identifiable unmixing + 36-run parameter sweep
-* [x] **Stage 3 Setup** — Jasper Ridge, Urban, and Cuprite datasets uploaded to `DATASETS/`
-* [ ] **Stage 3 Experiments** — Multi-scene evaluation, synthetic purity phase-transition study, and baseline comparisons (VCA, SPA, MVC-NMF, etc.)
-* [ ] **Final Paper** — Write-up and figure integration
+- [x] **Stage 1** — Autoencoder baseline (reconstruction loss only)
+- [x] **Stage 2** — Log-det volume regulariser for identifiable unmixing + 36-run parameter sweep
+- [x] **Stage 3 Setup** — Jasper Ridge, Urban, and Cuprite datasets uploaded to `DATASETS/`
+- [ ] **Stage 3 Experiments** — Multi-scene evaluation, synthetic purity phase-transition study, and baseline comparisons (VCA, SPA, MVC-NMF, etc.)
+- [ ] **Final Paper** — Write-up and figure integration
 
 ---
 
@@ -365,7 +347,3 @@ python generate_stage2_results.py
 ## License
 
 Academic use — NIT Jamshedpur CS1503 course project.
-
-```
-
-```
