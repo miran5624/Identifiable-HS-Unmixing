@@ -42,12 +42,13 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 | **Loss** | MSE reconstruction loss (Stage 1); + log-det volume regulariser (Stage 2) |
 | **Optimizer** | Full-batch Adam, lr = 0.001 |
 | **Training** | 2,000 epochs, seed = 0 |
+| **Non-negativity** | Decoder weights clamped to ≥ 0 after each step (Stage 2) |
 
 ---
 
 ## Dataset
 
-### Samson Scene *(Stage 1)*
+### Samson Scene
 
 | Property | Value |
 |----------|-------|
@@ -55,6 +56,8 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 | Spectral bands | 156 (401–889 nm, 3.13 nm resolution) |
 | Endmembers | 3 — **Soil**, **Tree**, **Water** |
 | Format | ENVI (`.img` + `.img.hdr`) |
+| Ground truth | `samgt.mat` (endmember matrix M + abundance matrix A) |
+| GT abundance layout | `fortran_to_c` (visually verified) |
 | Input scaling | Reflectance values ÷ 1,000 during training |
 
 ### Additional Datasets *(planned)*
@@ -101,14 +104,84 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 
 | Output | File |
 |--------|------|
-| Abundance maps (per component) | `Stage 1 Results/Abundance Maps/` |
-| Learned endmember spectra | `Stage 1 Results/Endmember Analysis/` |
-| Original vs. reconstructed spectra | `Stage 1 Results/Graphs/` |
-| Reconstruction error heatmap | `Stage 1 Results/Graphs/reconstruction_error_heatmap.png` |
-| Training loss curve | `Stage 1 Results/Graphs/training_loss_curve.png` |
-| Scatter plot (original vs. reconstructed) | `Stage 1 Results/Graphs/reconstruction_scatter.png` |
-| Metrics (CSV + JSON) | `Stage 1 Results/Metrics/` |
+| Abundance maps (per component) | `Stage 1 Update/Abundance Maps/` |
+| Learned endmember spectra | `Stage 1 Update/Endmember Analysis/` |
+| Original vs. reconstructed spectra | `Stage 1 Update/Graphs/` |
+| Reconstruction error heatmap | `Stage 1 Update/Graphs/reconstruction_error_heatmap.png` |
+| Training loss curve | `Stage 1 Update/Graphs/training_loss_curve.png` |
+| Scatter plot (original vs. reconstructed) | `Stage 1 Update/Graphs/reconstruction_scatter.png` |
+| Metrics (CSV + JSON) | `Stage 1 Update/Metrics/` |
 | Model outputs | Generated locally (`m.pt`, `r.pt`); not tracked |
+
+---
+
+## Stage 2 Results — Log-det Volume Regulariser
+
+> **Status: Complete**
+
+Stage 2 adds the **log-det volume penalty** to the autoencoder loss to enforce minimum-volume endmember recovery:
+
+$$\mathcal{L} = \underbrace{\frac{1}{N}\sum_i \|x_i - \hat{E}\,a_i\|^2}_{\text{per-pixel SSE}} + \lambda \cdot \underbrace{\log\det(\hat{E}^\top \hat{E} + \epsilon I)}_{\text{volume term}}$$
+
+The decoder weights are clamped non-negative after each gradient step to enforce $\hat{E} \in \mathbb{R}^{B \times p}_+$.
+
+### Experimental Setup
+
+| Parameter | Value |
+|-----------|-------|
+| Initialization | Random uniform [0, 1] on scaled reflectance |
+| Warm-up variants | 0 and 200 epochs (pure reconstruction before enabling volume penalty) |
+| Lambda values swept | 0, 1e-6, 1e-5, 1e-4, 0.001, 0.01 |
+| Seeds per config | 3 (seeds 0, 1, 2) |
+| Total experiment runs | **36** (12 configurations × 3 seeds) |
+| Endmember matching | Hungarian assignment minimising SAD |
+| GT abundance layout | `fortran_to_c` (visually verified) |
+
+### Parameter Sweep — Best Configurations
+
+| Metric | Best Value | Configuration |
+|--------|-----------|---------------|
+| **Mean SAD** | **14.60°** ± 8.49° | λ = 0.001, warm-up = 0, random init |
+| **Abundance RMSE** | **0.3155** ± 0.0037 | λ = 0.001, warm-up = 200, random init |
+
+### Saved Checkpoint Comparison (seed = 0)
+
+| Metric | Control (λ = 0) | Log-det (λ = 0.001) |
+|--------|----------------:|--------------------:|
+| Mean SAD (°) | **8.74** | 8.85 |
+| Abundance RMSE | **0.3114** | 0.3115 |
+| Reconstruction MSE (scaled) | 0.000551 | 0.000543 |
+| Log-det volume | 4.069 | 3.933 |
+| Min pairwise endmember angle | 31.00° | 30.10° |
+
+### Endmember Norm Ratios (Learned / Ground Truth)
+
+| Component | Control | Log-det |
+|-----------|--------:|--------:|
+| 1 | 0.839 | 0.837 |
+| 2 | 1.216 | 1.216 |
+| 3 | 0.087 | 0.086 |
+
+> Component 3 has substantially lower magnitude than ground truth — an important limitation.
+
+### Key Takeaway
+
+> Across the 36-run sweep, **λ = 0.001 consistently gives the best mean SAD and abundance RMSE**, indicating the log-det penalty is guiding the decoder toward better endmember recovery. However, the two saved seed-0 checkpoints show marginal differences — the control already achieves a low SAD of 8.74° for this seed. The benefit of the volume term is more apparent across multiple seeds and initializations, where it reduces variance and improves worst-case performance. These Samson experiments **demonstrate the regulariser's effect but do not conclusively prove the SSC identifiability theorem**.
+
+### Stage 2 Generated Outputs
+
+| Output | File |
+|--------|------|
+| Abundance maps (per component) | `Stage 2 Update/Abundance Maps/` |
+| Endmember spectra | `Stage 2 Update/Endmember Analysis/` |
+| Reconstruction plots | `Stage 2 Update/Graphs/` |
+| Endmember spectra vs. ground truth | `Stage 2 Results/Graphs/03_endmember_spectra_vs_ground_truth.png` |
+| Abundance maps vs. ground truth | `Stage 2 Results/Graphs/04_abundance_maps_vs_ground_truth.png` |
+| Mean SAD vs. λ sweep | `Stage 2 Results/Graphs/01_mean_SAD_vs_logdet_weight.png` |
+| Abundance RMSE vs. λ sweep | `Stage 2 Results/Graphs/02_abundance_RMSE_vs_logdet_weight.png` |
+| Per-run metrics (36 runs) | `Stage 2 Update/Metrics/samson_sad_rmse_per_run.csv` |
+| Summary by λ (12 configs) | `Stage 2 Update/Metrics/samson_sad_rmse_summary_by_lambda.csv` |
+| Checkpoint re-evaluation | `Stage 2 Update/Metrics/stage2_saved_checkpoint_metrics_recomputed.csv` |
 
 ---
 
@@ -124,17 +197,36 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 
 ```
 ├── README.md
+├── build_stage_updates.py               # Generates Stage 1 & 2 update outputs
 ├── DATASETS/
-│   └── SAMSON/                          # Samson ENVI data + reference code
+│   └── SAMSON/                          # Samson ENVI data + ground truth (samgt.mat)
 ├── Stage1/
-│   ├── ae.py                            # Autoencoder training script
+│   ├── ae.py                            # Stage 1 autoencoder training script
 │   └── stage1_results.md                # Run summary
-└── Stage 1 Results/
-    ├── Abundance Maps/                  # Per-component abundance maps
-    ├── Endmember Analysis/              # Learned endmember spectral curves
-    ├── Graphs/                          # Reconstruction plots, loss curve, heatmap
-    ├── Metrics/                         # stage1_metrics.csv, .json, loss history
-    └── stage1_results_summary.md        # Detailed results summary
+├── Stage 1 Update/
+│   ├── Abundance Maps/                  # Per-component abundance maps
+│   ├── Endmember Analysis/              # Learned endmember spectral curves
+│   ├── Graphs/                          # Reconstruction plots, loss curve, heatmap
+│   ├── Metrics/                         # stage1_metrics.csv, .json, loss history
+│   └── summary.md                       # Stage 1 updated results summary
+├── Stage2/
+│   ├── logdet_volume_autoencoder.py     # Stage 2 log-det volume training script
+│   ├── evaluate_samson_unmixing.py      # Ground-truth evaluation (SAD, RMSE, Hungarian matching)
+│   ├── generate_stage2_results.py       # Generates sweep plots & results summary
+│   ├── samson_unmixing_*_lambda0.pt     # Control checkpoint (λ=0)
+│   └── samson_unmixing_*_lambda0.001.pt # Best log-det checkpoint (λ=0.001)
+├── Stage 2 Update/
+│   ├── Abundance Maps/                  # Per-component abundance maps (log-det model)
+│   ├── Endmember Analysis/              # Learned endmember spectral curves
+│   ├── Evaluation Comparisons/          # Endmember & abundance maps vs. ground truth
+│   ├── Graphs/                          # Reconstruction plots, loss curve, heatmap
+│   ├── Metrics/                         # Per-run CSV, summary CSV, checkpoint metrics
+│   ├── Parameter Sweep/                 # SAD vs λ and RMSE vs λ sweep plots
+│   └── summary.md                       # Stage 2 results summary
+└── Stage 2 Results/
+    ├── Graphs/                          # Ground-truth comparison & sweep plots
+    ├── Metrics/                         # Evaluation CSVs
+    └── stage2_results_summary.md        # Detailed Stage 2 results summary
 ```
 
 ---
@@ -147,12 +239,15 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 Python ≥ 3.9
 PyTorch
 Spectral Python (SPy)
+NumPy
+SciPy
+Matplotlib
 ```
 
 ### Installation
 
 ```bash
-pip install torch spectral
+pip install torch spectral numpy scipy matplotlib
 ```
 
 ### Running Stage 1
@@ -170,12 +265,51 @@ python ae.py --data ../DATASETS/SAMSON/.../samson_1.img.hdr --epochs 2000
 
 **Outputs:** `m.pt` (model checkpoint) and `r.pt` (reconstructions, abundances, endmembers, loss history).
 
+### Running Stage 2
+
+```bash
+cd Stage2
+
+# Train with log-det volume regulariser (best config)
+python logdet_volume_autoencoder.py --lambda-vol 0.001 --epochs 2000
+
+# Train control baseline (no regulariser)
+python logdet_volume_autoencoder.py --lambda-vol 0 --epochs 2000
+
+# With warm-up (200 epochs reconstruction-only before enabling volume penalty)
+python logdet_volume_autoencoder.py --lambda-vol 0.001 --warmup-epochs 200 --epochs 2000
+```
+
+**Key flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--lambda-vol` | 1e-4 | Weight on log-det volume term (0 = control baseline) |
+| `--warmup-epochs` | 0 | Pure-reconstruction epochs before enabling volume penalty |
+| `--init` | `random` | Decoder init: `random` (uniform [0,1]) or `data` (farthest-point) |
+| `--seed` | 0 | Random seed for reproducibility |
+| `--vol-eps` | 1e-4 | Diagonal stabiliser δ in log det(E⊤E + δI) |
+
+### Evaluating Against Ground Truth
+
+```bash
+cd Stage2
+
+# Evaluate all checkpoints in Stage2/
+python evaluate_samson_unmixing.py \
+    --csv ../metrics_per_run.csv \
+    --summary-csv ../metrics_summary.csv
+
+# Generate comparison plots
+python generate_stage2_results.py
+```
+
 ---
 
 ## Roadmap
 
 - [x] **Stage 1** — Autoencoder baseline (reconstruction loss only)
-- [ ] **Stage 2** — Minimum-volume / log-det regulariser for identifiable unmixing
+- [x] **Stage 2** — Log-det volume regulariser for identifiable unmixing + 36-run parameter sweep
 - [ ] **Stage 3** — Evaluation on Jasper Ridge, Urban, and Cuprite datasets
 - [ ] **Stage 4** — Synthetic phase-transition study (identifiability vs. purity level)
 - [ ] **Baselines** — VCA, SPA, MVC-NMF, MiSiCNet, EndNet comparisons
