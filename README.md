@@ -1,3 +1,4 @@
+```markdown
 # Identifiable Hyperspectral Unmixing with Learned Decoders
 ## When Can Endmembers Be Recovered?
 
@@ -24,7 +25,9 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 
 ## Architecture
 
+
 ```
+
 ┌───────────── Encoder ──────────────┐     ┌──── Decoder ────┐
 │ Linear(156 → 78) → ReLU           │     │                 │
 │ Linear(78 → 3)   → Softmax        │ ──► │ Linear(3 → 156) │
@@ -32,23 +35,27 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 │ Output: abundances on the simplex  │     │ Weights = E     │
 └────────────────────────────────────┘     └─────────────────┘
 
-         x ─► Encoder ─► a ─► Decoder ─► x̂ = E·a
+```
+     x ─► Encoder ─► a ─► Decoder ─► x̂ = E·a
+
+```
+
 ```
 
 | Component | Details |
 |-----------|---------|
 | **Encoder** | 2-layer MLP → Softmax (outputs lie on the probability simplex) |
 | **Decoder** | Single bias-free linear layer — weights **are** the endmember matrix $E$ |
-| **Loss** | MSE reconstruction loss (Stage 1); + log-det volume regulariser (Stage 2) |
+| **Loss** | MSE reconstruction loss (Stage 1); + log-det volume regulariser (Stage 2 & 3) |
 | **Optimizer** | Full-batch Adam, lr = 0.001 |
 | **Training** | 2,000 epochs, seed = 0 |
-| **Non-negativity** | Decoder weights clamped to ≥ 0 after each step (Stage 2) |
+| **Non-negativity** | Decoder weights clamped to ≥ 0 after each step (Stage 2 & 3) |
 
 ---
 
-## Dataset
+## Datasets
 
-### Samson Scene
+### Samson Scene *(Stages 1 & 2)*
 
 | Property | Value |
 |----------|-------|
@@ -60,13 +67,14 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 | GT abundance layout | `fortran_to_c` (visually verified) |
 | Input scaling | Reflectance values ÷ 1,000 during training |
 
-### Additional Datasets *(planned)*
+### Stage 3 Benchmark & Synthetic Datasets *(Uploaded)*
 
-| Dataset | Size | Bands | Endmembers |
-|---------|------|-------|------------|
-| Jasper Ridge | 100 × 100 | 198 | 4 |
-| Urban (HYDICE) | 307 × 307 | 162 | 4–6 |
-| Cuprite (AVIRIS) | — | — | 12 |
+| Dataset | Size | Bands | Endmembers | Files (`DATASETS/`) |
+|---------|------|-------|------------|---------------------|
+| **Jasper Ridge** | 100 × 100 | 198 | 4 | `JASPER/jasperRidge2_R198.mat`, `end4.mat` |
+| **Urban (HYDICE)** | 307 × 307 | 162 | 4 | `URBAN/Urban_R162.mat`, `end4_groundTruth.mat` |
+| **Cuprite (AVIRIS)** | Mineral scene | 224 | 12 | `CUPRITE/Cuprite_f970619t01p02_r02_sc03.a.rfl.mat`, `groundTruth_Cuprite_nEnd12.mat` |
+| **Synthetic (USGS)** | Variable | — | 3–6 | Sampled directly from USGS mineral spectra in `groundTruth_Cuprite_nEnd12.mat` |
 
 ---
 
@@ -185,6 +193,17 @@ The decoder weights are clamped non-negative after each gradient step to enforce
 
 ---
 
+## Stage 3 — Multi-Scene Evaluation, Synthetic Phase-Transition & Baselines
+
+> **Status: In Progress (Datasets Uploaded)**
+
+Stage 3 completes the experimental evaluation required for the final paper:
+- **Benchmark Scenes:** Evaluate the log-det autoencoder on **Jasper Ridge**, **Urban (HYDICE)**, and **Cuprite (AVIRIS)**.
+- **Synthetic Phase-Transition Study:** Generate synthetic linear mixtures from USGS mineral spectra (`groundTruth_Cuprite_nEnd12.mat`) across varying purity levels to measure identifiability success rate vs. purity.
+- **Baselines:** Compare against classical and deep unmixing baselines (**VCA**, **SPA**, **MVC-NMF**, and standard autoencoders) on SAD and abundance RMSE.
+
+---
+
 ## Mathematical Core
 
 1. **Separability (pure-pixel) condition** — identifiability via vertex search (VCA, SPA); noisy-robustness bound: error $O(\kappa(E)\,\epsilon)$ (Gillis–Vavasis).
@@ -195,11 +214,16 @@ The decoder weights are clamped non-negative after each gradient step to enforce
 
 ## Repository Structure
 
+
 ```
+
 ├── README.md
 ├── build_stage_updates.py               # Generates Stage 1 & 2 update outputs
 ├── DATASETS/
-│   └── SAMSON/                          # Samson ENVI data + ground truth (samgt.mat)
+│   ├── CUPRITE/                         # Cuprite AVIRIS scene + 12-endmember USGS GT
+│   ├── JASPER/                          # Jasper Ridge (198 bands) + 4-endmember GT
+│   ├── SAMSON/                          # Samson ENVI data + ground truth (samgt.mat)
+│   └── URBAN/                           # Urban HYDICE (162 bands) + 4-endmember GT
 ├── Stage1/
 │   ├── ae.py                            # Stage 1 autoencoder training script
 │   └── stage1_results.md                # Run summary
@@ -213,8 +237,8 @@ The decoder weights are clamped non-negative after each gradient step to enforce
 │   ├── logdet_volume_autoencoder.py     # Stage 2 log-det volume training script
 │   ├── evaluate_samson_unmixing.py      # Ground-truth evaluation (SAD, RMSE, Hungarian matching)
 │   ├── generate_stage2_results.py       # Generates sweep plots & results summary
-│   ├── samson_unmixing_*_lambda0.pt     # Control checkpoint (λ=0)
-│   └── samson_unmixing_*_lambda0.001.pt # Best log-det checkpoint (λ=0.001)
+│   ├── samson_unmixing_*lambda0.pt     # Control checkpoint (λ=0)
+│   └── samson_unmixing*_lambda0.001.pt # Best log-det checkpoint (λ=0.001)
 ├── Stage 2 Update/
 │   ├── Abundance Maps/                  # Per-component abundance maps (log-det model)
 │   ├── Endmember Analysis/              # Learned endmember spectral curves
@@ -224,9 +248,10 @@ The decoder weights are clamped non-negative after each gradient step to enforce
 │   ├── Parameter Sweep/                 # SAD vs λ and RMSE vs λ sweep plots
 │   └── summary.md                       # Stage 2 results summary
 └── Stage 2 Results/
-    ├── Graphs/                          # Ground-truth comparison & sweep plots
-    ├── Metrics/                         # Evaluation CSVs
-    └── stage2_results_summary.md        # Detailed Stage 2 results summary
+├── Graphs/                          # Ground-truth comparison & sweep plots
+├── Metrics/                         # Evaluation CSVs
+└── stage2_results_summary.md        # Detailed Stage 2 results summary
+
 ```
 
 ---
@@ -235,19 +260,23 @@ The decoder weights are clamped non-negative after each gradient step to enforce
 
 ### Prerequisites
 
+
 ```
+
 Python ≥ 3.9
 PyTorch
 Spectral Python (SPy)
 NumPy
 SciPy
 Matplotlib
+
 ```
 
 ### Installation
 
 ```bash
 pip install torch spectral numpy scipy matplotlib
+
 ```
 
 ### Running Stage 1
@@ -255,12 +284,14 @@ pip install torch spectral numpy scipy matplotlib
 ```bash
 cd Stage1
 python ae.py --epochs 2000 --lr 0.001 --output-dir .
+
 ```
 
 The script auto-discovers `samson_1.img.hdr` under the project tree. To specify manually:
 
 ```bash
 python ae.py --data ../DATASETS/SAMSON/.../samson_1.img.hdr --epochs 2000
+
 ```
 
 **Outputs:** `m.pt` (model checkpoint) and `r.pt` (reconstructions, abundances, endmembers, loss history).
@@ -278,12 +309,13 @@ python logdet_volume_autoencoder.py --lambda-vol 0 --epochs 2000
 
 # With warm-up (200 epochs reconstruction-only before enabling volume penalty)
 python logdet_volume_autoencoder.py --lambda-vol 0.001 --warmup-epochs 200 --epochs 2000
+
 ```
 
 **Key flags:**
 
 | Flag | Default | Description |
-|------|---------|-------------|
+| --- | --- | --- |
 | `--lambda-vol` | 1e-4 | Weight on log-det volume term (0 = control baseline) |
 | `--warmup-epochs` | 0 | Pure-reconstruction epochs before enabling volume penalty |
 | `--init` | `random` | Decoder init: `random` (uniform [0,1]) or `data` (farthest-point) |
@@ -302,17 +334,18 @@ python evaluate_samson_unmixing.py \
 
 # Generate comparison plots
 python generate_stage2_results.py
+
 ```
 
 ---
 
 ## Roadmap
 
-- [x] **Stage 1** — Autoencoder baseline (reconstruction loss only)
-- [x] **Stage 2** — Log-det volume regulariser for identifiable unmixing + 36-run parameter sweep
-- [ ] **Stage 3** — Evaluation on Jasper Ridge, Urban, and Cuprite datasets
-- [ ] **Stage 4** — Synthetic phase-transition study (identifiability vs. purity level)
-- [ ] **Baselines** — VCA, SPA, MVC-NMF, MiSiCNet, EndNet comparisons
+* [x] **Stage 1** — Autoencoder baseline (reconstruction loss only)
+* [x] **Stage 2** — Log-det volume regulariser for identifiable unmixing + 36-run parameter sweep
+* [x] **Stage 3 Setup** — Jasper Ridge, Urban, and Cuprite datasets uploaded to `DATASETS/`
+* [ ] **Stage 3 Experiments** — Multi-scene evaluation, synthetic purity phase-transition study, and baseline comparisons (VCA, SPA, MVC-NMF, etc.)
+* [ ] **Final Paper** — Write-up and figure integration
 
 ---
 
@@ -321,7 +354,7 @@ python generate_stage2_results.py
 1. J. M. Bioucas-Dias et al., *"Hyperspectral unmixing overview: geometrical, statistical, and sparse regression-based approaches,"* IEEE JSTARS 5(2), 2012.
 2. J. M. P. Nascimento & J. M. Bioucas-Dias, *"Vertex component analysis: a fast algorithm to unmix hyperspectral data,"* IEEE TGRS 43(4), 2005.
 3. N. Gillis & S. A. Vavasis, *"Fast and robust recursive algorithms for separable nonnegative matrix factorization,"* IEEE TPAMI 36(4), 2014.
-4. X. Fu, K. Huang, N. D. Sidiropoulos & W.-K. Ma, *"Nonnegative matrix factorization for signal and data analytics,"* IEEE Signal Processing Magazine 36(2), 2019.
+4. X. Fu, K. Huang, N. D. Sidiropoulos & W.-K. Ma, *"Nonnegative matrix factorization for signal and data analytics: identifiability, algorithms, and applications,"* IEEE Signal Processing Magazine 36(2), 2019.
 5. C.-H. Lin et al., *"Identifiability of the simplex volume minimization criterion for blind hyperspectral unmixing,"* IEEE TGRS 53(10), 2015.
 6. L. Miao & H. Qi, *"Endmember extraction from highly mixed data using minimum volume constrained NMF,"* IEEE TGRS 45(3), 2007.
 7. B. Palsson et al., *"Hyperspectral unmixing using a neural network autoencoder,"* IEEE Access 6, 2018.
@@ -332,3 +365,7 @@ python generate_stage2_results.py
 ## License
 
 Academic use — NIT Jamshedpur CS1503 course project.
+
+```
+
+```
