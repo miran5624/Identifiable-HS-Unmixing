@@ -75,31 +75,33 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 
 > **Status: Complete**
 
+Numerical results and checkpoints were refreshed from a new 2,000-epoch run using Python 3.13 and PyTorch 2.11.0+cpu.
+
 ### Reconstruction Metrics
 
 | Metric | Value |
 |--------|------:|
-| Reconstruction MSE (original units) | **2,981.47** |
-| Reconstruction RMSE | **54.60** |
-| Reconstruction MAE | **31.93** |
-| Final Scaled Training MSE | 0.002981 |
+| Reconstruction MSE (original units) | **2,962.18** |
+| Reconstruction RMSE | **54.43** |
+| Reconstruction MAE | **31.68** |
+| Final Scaled Training MSE | 0.002962 |
 | Mean-Spectrum Baseline MSE | 37,246.12 |
-| **MSE Reduction vs. Baseline** | **92.0%** |
+| **MSE Reduction vs. Baseline** | **92.05%** |
 
 ### Identifiability Metrics (Ground-Truth Comparison)
 
 | Metric | Value |
 |--------|------:|
-| Mean Spectral Angle to GT Endmembers | **34.26°** |
-| Abundance RMSE vs. Ground Truth | **0.3025** |
-| Mean Abundance Entropy | 0.7682 |
+| Mean Spectral Angle to GT Endmembers | **34.35°** |
+| Abundance RMSE vs. Ground Truth | **0.3045** |
+| Mean Abundance Entropy | 0.7698 |
 | Max Abundance Sum Error from 1 | 1.79 × 10⁻⁷ |
 
-**Best endmember permutation:** predicted (0, 1, 2) → GT (0, 2, 1), with spectral angles of 15.57°, 45.83°, and 41.38° in predicted-component order. The abundance RMSE uses the visually verified `fortran_to_c` Samson ground-truth layout.
+**Best endmember permutation:** predicted (0, 1, 2) → GT (0, 2, 1), with spectral angles of 15.57°, 46.11°, and 41.38° in predicted-component order. The abundance RMSE uses the fixed `fortran_to_c` Samson ground-truth layout.
 
 ### Key Takeaway
 
-> The autoencoder reconstructs the scene well (92% MSE reduction) and keeps abundances on the simplex, **but** endmember recovery is poor (avg spectral angle 34.26°). This confirms the core hypothesis: **reconstruction loss alone does not guarantee identifiable endmembers**. A volume regulariser is needed.
+> The autoencoder reconstructs the scene well (92.05% MSE reduction) and keeps abundances on the simplex, **but** endmember recovery is poor (average spectral angle 34.35°). This supports the project hypothesis that reconstruction loss alone does not guarantee identifiable endmembers.
 
 ### Generated Outputs
 
@@ -112,7 +114,7 @@ where $E \in \mathbb{R}^{B \times p}_+$ is the endmember matrix and $a \in \Delt
 | Training loss curve | `Stage 1 Update/Graphs/training_loss_curve.png` |
 | Scatter plot (original vs. reconstructed) | `Stage 1 Update/Graphs/reconstruction_scatter.png` |
 | Metrics (CSV + JSON) | `Stage 1 Update/Metrics/` |
-| Model outputs | Generated locally (`m.pt`, `r.pt`); not tracked |
+| Model outputs | `Stage1/m.pt`, `Stage1/r.pt` |
 
 ---
 
@@ -140,20 +142,22 @@ The decoder weights are clamped non-negative after each gradient step to enforce
 
 ### Parameter Sweep — Best Configurations
 
+The run metrics and checkpoints below were regenerated in Python 3.13 with PyTorch 2.11.0+cpu. Existing graphs were not regenerated.
+
 | Metric | Best Value | Configuration |
 |--------|-----------|---------------|
-| **Mean SAD** | **14.60°** ± 8.49° | λ = 0.001, warm-up = 0, random init |
-| **Abundance RMSE** | **0.3155** ± 0.0037 | λ = 0.001, warm-up = 200, random init |
+| **Mean SAD** | **14.61°** ± 8.51° | λ = 0.001, warm-up = 0, random init |
+| **Abundance RMSE** | **0.3152** ± 0.0072 | λ = 0.00001, warm-up = 0, random init |
 
 ### Saved Checkpoint Comparison (seed = 0)
 
 | Metric | Control (λ = 0) | Log-det (λ = 0.001) |
 |--------|----------------:|--------------------:|
 | Mean SAD (°) | **8.74** | 8.85 |
-| Abundance RMSE | **0.3114** | 0.3115 |
-| Reconstruction MSE (scaled) | 0.000551 | 0.000543 |
-| Log-det volume | 4.069 | 3.933 |
-| Min pairwise endmember angle | 31.00° | 30.10° |
+| Abundance RMSE | **0.3079** | 0.3114 |
+| Reconstruction MSE (scaled) | 0.000570 | 0.000543 |
+| Log-det volume | 4.072 | 3.933 |
+| Min pairwise endmember angle | 30.99° | 30.11° |
 
 ### Endmember Norm Ratios (Learned / Ground Truth)
 
@@ -167,7 +171,7 @@ The decoder weights are clamped non-negative after each gradient step to enforce
 
 ### Key Takeaway
 
-> Across the 36-run sweep, **λ = 0.001 consistently gives the best mean SAD and abundance RMSE**, indicating the log-det penalty is guiding the decoder toward better endmember recovery. However, the two saved seed-0 checkpoints show marginal differences — the control already achieves a low SAD of 8.74° for this seed. The benefit of the volume term is more apparent across multiple seeds and initializations, where it reduces variance and improves worst-case performance. These Samson experiments **demonstrate the regulariser's effect but do not conclusively prove the SSC identifiability theorem**.
+> In the regenerated 36-run sweep, λ = 0.001 has the lowest mean SAD, while λ = 0.00001 has the lowest mean abundance RMSE. This is a tradeoff rather than a single setting winning both measures. In the seed-0 examples, the control has slightly lower SAD and abundance RMSE than the λ = 0.001 run. These Samson experiments do not conclusively prove the SSC identifiability theorem.
 
 ### Stage 2 Generated Outputs
 

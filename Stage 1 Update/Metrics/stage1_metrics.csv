@@ -5,18 +5,18 @@ image_width,95
 spectral_bands,156
 components,3
 pixels,9025
-MSE_original_units,2981.46630859375
-RMSE_original_units,54.602806091308594
-MAE_original_units,31.929304122924805
-final_scaled_MSE_from_training,0.002981466008350253
-final_MSE_from_training,2981.466064453125
+MSE_original_units,2962.1770132381685
+RMSE_original_units,54.425885507157055
+MAE_original_units,31.68162782825864
+final_scaled_MSE_from_training,0.0029621769208461046
+final_MSE_from_training,2962.177001953125
 input_scale,1000.0
-mean_spectrum_baseline_MSE,37246.1171875
-MSE_reduction_vs_baseline_percent,91.99522921118246
-mean_abundance_entropy,0.7681623101234436
-max_abundance_sum_error,1.7881393432617188e-7
-ground_truth_endmember_mean_SAD_degrees,34.26
+mean_spectrum_baseline_MSE,37246.12089118974
+MSE_reduction_vs_baseline_percent,92.04701874353083
+mean_abundance_entropy,0.7697842507730505
+max_abundance_sum_error,1.341104507446289e-07
+ground_truth_endmember_mean_SAD_degrees,34.35434523115011
 ground_truth_endmember_permutation,"[0, 2, 1]"
-ground_truth_endmember_SAD_degrees_by_predicted_component,"[15.57, 45.83, 41.38]"
+ground_truth_endmember_SAD_degrees_by_predicted_component,"[15.574054697897669, 46.10851458439507, 41.38046641115759]"
 ground_truth_abundance_layout,fortran_to_c
-abundance_RMSE_ground_truth,0.302463
+abundance_RMSE_ground_truth,0.3044878605400035

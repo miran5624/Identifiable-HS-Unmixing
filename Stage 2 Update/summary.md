@@ -1,50 +1,31 @@
-# Stage 2 Update — Log-det Volume Autoencoder
+# Stage 2 Results — Samson
 
-## Dataset and configuration
-- Dataset: Samson
-- Image dimensions: 95 x 95 pixels
-- Spectral bands: 156
-- Endmembers: 3
-- Epochs: 2000
-- Initialization: random
-- Random seed: 0
-- Log-det weight: 0.001
-- Warm-up epochs: 0
-- Input scale: 1000.0
-- Ground-truth abundance layout: fortran_to_c
+## Objective and setup
+- Dataset: Samson (95 x 95 pixels, 156 bands, 3 endmembers).
+- Training: full-batch Adam, 2,000 epochs per run, seeds 0, 1, and 2.
+- Sweep: warm-up epochs 0 and 200; log-det weights 0, 1e-6, 1e-5, 1e-4, 1e-3, and 1e-2.
+- Ground-truth abundance layout: `fortran_to_c`; endmembers matched using Hungarian assignment on spectral angle.
+- All 36 runs were freshly trained and evaluated with Python 3.13, PyTorch 2.11.0+cpu, and NumPy 2.4.2.
 
-## Saved checkpoint
-- Final reconstruction MSE: 542.554718
-- Final scaled reconstruction MSE: 0.00054255
-- Final log-det value: 3.933033
-- Abundance shape: (9025, 3)
-- Endmember shape: (156, 3)
+## Recomputed sweep results
+- Runs: 36; grouped configurations: 12.
+- Lowest mean SAD: 14.6061 degrees (lambda=0.001, warm-up=0).
+- Lowest mean abundance RMSE: 0.315213 (lambda=1e-05, warm-up=0).
+- Both metric tables were rebuilt from the freshly generated checkpoints.
 
-## Evaluation provenance
-- 36 experiment records and 12 grouped configurations are retained
-  in the parameter-sweep metric CSV files.
-- Two raw checkpoints are available for independent re-evaluation.
-- The remaining 34 runs are represented by recorded CSV metrics and
-  cannot be independently rerun from raw checkpoints in this repository.
+## Seed-0 example (warm-up 0, lambda=0.001)
+- Mean SAD: 8.850217 degrees.
+- Abundance RMSE: 0.311409.
+- Final scaled reconstruction MSE: 0.000542661.
+- Final log-det value: 3.933120.
 
-## Component-order note
-The maps and endmember plots retain the model's native component order.
-Component numbers are not guaranteed to identify the same material
-across different models; use the recorded Hungarian matching permutation
-when comparing components.
+## Matched endmember magnitude ratios
+Ratios compare learned endmember norms in original data units with ground-truth endmember norms scaled to those same units. Components are listed in matched ground-truth order.
 
-## Graphs
-Six graph types matching the Stage 1 presentation:
-1. Centre-pixel original vs reconstructed spectrum.
-2. Scene-mean original vs reconstructed spectrum.
-3. Combined predicted abundance maps.
-4. Per-pixel reconstruction RMSE heatmap.
-5. Original vs reconstructed scatter.
-6. Training reconstruction-loss curve.
+| Component | Control | Log-det |
+|---|---:|---:|
+| 1 | 0.8394 | 0.8372 |
+| 2 | 1.2169 | 1.2156 |
+| 3 | 0.0866 | 0.0860 |
 
-## Additional outputs
-- Three individual abundance maps.
-- Three individual endmember plots and one combined plot.
-- Parameter sweep graphs.
-- Ground-truth comparison graphs.
-- Four evaluation CSV files.
+The saved graphs were not regenerated during this numerical refresh and may still show previous runs. No graph was used to calculate or validate these metrics.
