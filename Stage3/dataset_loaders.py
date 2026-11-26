@@ -36,6 +36,20 @@ class BenchmarkDataset:
     default_gt_layout: str = "fortran_to_c"
 
 
+def clip_negative_reflectance(values: np.ndarray) -> tuple[np.ndarray, int]:
+    """Clip negative reflectance samples to zero and return their count.
+
+    Negative entries include invalid reflectance sentinels (for example, -50 in
+    the Cuprite cube) and are not valid under the non-negative linear mixing
+    model used by the Stage 3 unmixing methods.
+    """
+    array = np.asarray(values)
+    count = int(np.count_nonzero(array < 0))
+    if count:
+        array = np.maximum(array, 0)
+    return array, count
+
+
 def resolve_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 

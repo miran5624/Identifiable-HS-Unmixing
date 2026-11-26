@@ -199,6 +199,10 @@ Stage 3 completes the experimental evaluation required for the final paper:
 - **Synthetic Phase-Transition Study:** Generate synthetic linear mixtures from USGS mineral spectra (`groundTruth_Cuprite_nEnd12.mat`) across varying purity levels to measure identifiability success rate vs. purity.
 - **Baselines:** Compare against classical and deep unmixing baselines (**VCA**, **SPA**, **MVC-NMF**, and standard autoencoders) on SAD and abundance RMSE.
 
+Stage 3 clips negative reflectance samples to zero before fitting either the autoencoder or classical baselines. The number clipped is recorded in newly saved checkpoints and evaluation rows. In the synthetic purity study, a trial counts as identifiable only when **every** matched endmember is within the selected spectral-angle threshold.
+
+**Reproducibility note:** The active `Stage 3 Results/real_datasets_per_run_metrics.csv` now contains 18 rows backed by the 18 checkpoints in `Stage3/`. The six saved seed-0 Cuprite runs were refreshed with negative-sample clipping and re-evaluated. The other 54 historical metric rows, which have no corresponding saved checkpoints, are preserved as unverified records in `Stage 3 Results/real_datasets_metrics_missing_checkpoints.csv`.
+
 ---
 
 ## Mathematical Core

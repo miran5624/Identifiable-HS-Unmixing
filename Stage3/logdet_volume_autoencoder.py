@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, optim
 
-from dataset_loaders import load_benchmark_dataset, resolve_repo_root
+from dataset_loaders import clip_negative_reflectance, load_benchmark_dataset, resolve_repo_root
 
 
 class LogDetVolumeAE(nn.Module):
@@ -124,6 +124,8 @@ def train_logdet_ae(
     x_np = np.ascontiguousarray(x_original, dtype=np.float32)
     if not np.isfinite(x_np).all():
         raise ValueError("Input hyperspectral data contains NaN or infinite values.")
+    x_np, negative_samples_clipped = clip_negative_reflectance(x_np)
+    x_np = np.ascontiguousarray(x_np, dtype=np.float32)
 
     n_pixels, bands = x_np.shape
     scale = float(np.max(x_np)) if input_scale is None else float(input_scale)
@@ -290,6 +292,7 @@ def train_logdet_ae(
             "lr": lr,
             "decoder_lr": dec_lr,
             "input_scale": scale,
+            "negative_samples_clipped": negative_samples_clipped,
             "batch_size": eff_batch,
             "components": components,
             "bands": bands,
@@ -370,6 +373,10 @@ def main() -> None:
     )
     payload["dataset"] = ds.name
     payload["settings"]["data_shape"] = (h, w, bands)
+    print(
+        "Negative reflectance samples clipped to zero: "
+        f"{payload['settings']['negative_samples_clipped']}"
+    )
 
     out_dir = args.output_dir.expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
