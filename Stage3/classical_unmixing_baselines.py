@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from dataset_loaders import load_benchmark_dataset, resolve_repo_root
+from dataset_loaders import clip_negative_reflectance, load_benchmark_dataset, resolve_repo_root
 from logdet_volume_autoencoder import log_det_volume_loss, per_pixel_sse_loss, set_deterministic
 
 
@@ -254,7 +254,13 @@ def run_baseline(
 ) -> dict[str, Any]:
     """Unified entry point for all classical baselines; returns the same dict schema as LogDet-AE."""
     x_np = np.asarray(x_original, dtype=np.float64)
+    if x_np.ndim != 2 or not np.isfinite(x_np).all():
+        raise ValueError("Input spectra must be a finite 2D array.")
+    x_np, negative_samples_clipped = clip_negative_reflectance(x_np)
+    x_np = np.asarray(x_np, dtype=np.float64)
     scale = float(np.max(x_np))
+    if scale <= 0.0:
+        raise ValueError("Input spectra must contain at least one positive reflectance value.")
     x_scaled = x_np / scale
     bands = x_np.shape[1]
 
@@ -312,6 +318,7 @@ def run_baseline(
             "seed": seed,
             "lambda_vol": lambda_vol if method_low == "mvc_nmf" else 0.0,
             "input_scale": scale,
+            "negative_samples_clipped": negative_samples_clipped,
             "components": components,
             "bands": bands,
         },
@@ -375,6 +382,10 @@ def main() -> None:
             )
             payload["dataset"] = ds.name
             payload["settings"]["data_shape"] = (h, w, bands)
+            print(
+                "Negative reflectance samples clipped to zero: "
+                f"{payload['settings']['negative_samples_clipped']}"
+            )
             out_path = out_dir / f"{ds.name}_baseline_{method}_seed{seed}.pt"
             torch.save(payload, out_path)
             print(

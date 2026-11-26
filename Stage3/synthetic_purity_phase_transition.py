@@ -21,6 +21,8 @@ def select_well_separated_spectra(
     library: np.ndarray, p: int, seed: int
 ) -> tuple[np.ndarray, list[int]]:
     """Greedy max-min spectral angle selection of p distinct USGS endmembers."""
+    if p < 2:
+        raise ValueError("At least two endmembers are required for unmixing.")
     rng = np.random.default_rng(seed)
     n_mat = library.shape[1]
     if n_mat < p:
@@ -40,33 +42,59 @@ def sample_purity_constrained_abundances(
     n_pixels: int, p: int, max_purity: float, rng: np.random.Generator, alpha: float = 0.8
 ) -> np.ndarray:
     """Sample simplex abundances A (N, p) with max_k A_{ik} <= max_purity."""
+    if n_pixels < 1:
+        raise ValueError("n_pixels must be positive.")
+    if p < 2:
+        raise ValueError("At least two endmembers are required for unmixing.")
+    if not np.isfinite(max_purity) or max_purity > 1.0:
+        raise ValueError("max_purity must be finite and no greater than 1.0.")
     if max_purity <= 1.0 / p + 1e-3:
         raise ValueError(f"max_purity={max_purity} must exceed 1/p={1.0 / p:.3f}")
+    if not np.isfinite(alpha) or alpha <= 0.0:
+        raise ValueError("alpha must be finite and positive.")
 
-    if max_purity >= 0.999:
+    if max_purity == 1.0:
+        if n_pixels < p:
+            raise ValueError(
+                f"At least {p} pixels are required to include one pure pixel per endmember."
+            )
         a = rng.dirichlet(np.full(p, 0.35), size=n_pixels)
+        pure_per_component = min(5, n_pixels // p)
         for k in range(p):
-            a[k * 5 : (k + 1) * 5, :] = 0.0
-            a[k * 5 : (k + 1) * 5, k] = 1.0
+            start = k * pure_per_component
+            stop = start + pure_per_component
+            a[start:stop, :] = 0.0
+            a[start:stop, k] = 1.0
         rng.shuffle(a, axis=0)
         return a
 
     collected = []
     total = 0
+    proposals = 0
     batch = max(n_pixels * 4, 8000)
+    proposal_budget = max(100_000, n_pixels * 100)
     while total < n_pixels:
-        cand = rng.dirichlet(np.full(p, alpha), size=batch)
+        batch_size = min(batch, proposal_budget - proposals)
+        cand = rng.dirichlet(np.full(p, alpha), size=batch_size)
+        proposals += batch_size
         keep = cand[np.max(cand, axis=1) <= max_purity]
         if keep.shape[0] > 0:
             collected.append(keep)
             total += keep.shape[0]
+        if proposals >= proposal_budget and total < n_pixels:
+            raise ValueError(
+                f"max_purity={max_purity} accepted only {total}/{n_pixels} abundances "
+                f"within {proposal_budget} proposals; increase the purity cap."
+            )
     return np.vstack(collected)[:n_pixels]
 
 
 def add_gaussian_snr_noise(
     clean_x: np.ndarray, snr_db: float, rng: np.random.Generator
 ) -> np.ndarray:
-    if not np.isfinite(snr_db):
+    if np.isnan(snr_db) or snr_db == -np.inf:
+        raise ValueError("snr_db must be finite or positive infinity.")
+    if snr_db == np.inf:
         return clean_x.copy()
     signal_power = float(np.mean(clean_x**2))
     noise_power = signal_power / (10.0 ** (snr_db / 10.0))
@@ -96,6 +124,11 @@ def score_estimate(
     }
 
 
+def is_identifiable_within_sad(metrics: dict[str, float], threshold_deg: float) -> bool:
+    """Require every matched endmember to meet the spectral-angle threshold."""
+    return metrics["max_sad_deg"] <= threshold_deg
+
+
 def parse_args() -> argparse.Namespace:
     repo_root = resolve_repo_root()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -117,14 +150,56 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lambda-ae", type=float, default=1e-3)
     parser.add_argument("--lambda-mvc", type=float, default=1e-3)
     parser.add_argument("--mvc-iters", type=int, default=200)
-    parser.add_argument("--sad-success-deg", type=float, default=5.0)
+    parser.add_argument(
+        "--sad-success-deg",
+        type=float,
+        default=5.0,
+        help="Success threshold; every matched endmember must meet this SAD (degrees).",
+    )
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--results-dir", type=Path, default=repo_root / "Stage 3 Results")
     return parser.parse_args()
 
 
+def validate_experiment_args(args: argparse.Namespace) -> None:
+    """Reject invalid experiment settings before loading data or starting runs."""
+    if args.trials < 1:
+        raise ValueError("--trials must be at least 1.")
+    if args.n_pixels < 1:
+        raise ValueError("--n-pixels must be at least 1.")
+    if args.components < 2:
+        raise ValueError("--components must be at least 2.")
+    if args.ae_epochs < 1:
+        raise ValueError("--ae-epochs must be at least 1.")
+    if not 0 <= args.ae_warmup <= args.ae_epochs:
+        raise ValueError("--ae-warmup must be between 0 and --ae-epochs.")
+    if args.mvc_iters < 1:
+        raise ValueError("--mvc-iters must be at least 1.")
+    if not np.isfinite(args.sad_success_deg) or not 0.0 <= args.sad_success_deg <= 180.0:
+        raise ValueError("--sad-success-deg must be finite and between 0 and 180.")
+    if np.isnan(args.snr_db) or args.snr_db == -np.inf:
+        raise ValueError("--snr-db must be finite or positive infinity.")
+    for name in ("ae_lr", "lambda_ae", "lambda_mvc"):
+        value = getattr(args, name)
+        if not np.isfinite(value) or value < 0.0 or (name == "ae_lr" and value == 0.0):
+            raise ValueError(f"--{name.replace('_', '-')} has an invalid value: {value}.")
+    if args.ae_decoder_lr is not None and (
+        not np.isfinite(args.ae_decoder_lr) or args.ae_decoder_lr <= 0.0
+    ):
+        raise ValueError("--ae-decoder-lr must be finite and positive.")
+    for purity in args.purity_levels:
+        if not np.isfinite(purity) or purity > 1.0:
+            raise ValueError(f"Invalid purity level {purity}; levels must be finite and <= 1.")
+        if purity <= 1.0 / args.components + 1e-3:
+            raise ValueError(
+                f"Purity level {purity} must exceed 1/components + 0.001 "
+                f"(components={args.components})."
+            )
+
+
 def main() -> None:
     args = parse_args()
+    validate_experiment_args(args)
     repo_root = resolve_repo_root()
     library, names, src_path = load_usgs_library(repo_root=repo_root, usgs_path=args.usgs)
     print(f"Loaded USGS library: {src_path} | shape={library.shape}")
@@ -173,10 +248,11 @@ def main() -> None:
                         "empirical_max_purity": empirical_max_purity,
                         "trial": trial,
                         "snr_db": args.snr_db,
+                        "sad_success_threshold_deg": args.sad_success_deg,
                         "method": res["method"],
                         **metrics,
-                        "identifiable_5deg": int(metrics["mean_sad_deg"] <= args.sad_success_deg),
-                        "identifiable_3deg": int(metrics["mean_sad_deg"] <= 3.0),
+                        "identifiable_at_threshold": int(is_identifiable_within_sad(metrics, args.sad_success_deg)),
+                        "identifiable_3deg": int(is_identifiable_within_sad(metrics, 3.0)),
                     }
                 )
 
@@ -213,10 +289,11 @@ def main() -> None:
                         "empirical_max_purity": empirical_max_purity,
                         "trial": trial,
                         "snr_db": args.snr_db,
+                        "sad_success_threshold_deg": args.sad_success_deg,
                         "method": label,
                         **metrics,
-                        "identifiable_5deg": int(metrics["mean_sad_deg"] <= args.sad_success_deg),
-                        "identifiable_3deg": int(metrics["mean_sad_deg"] <= 3.0),
+                        "identifiable_at_threshold": int(is_identifiable_within_sad(metrics, args.sad_success_deg)),
+                        "identifiable_3deg": int(is_identifiable_within_sad(metrics, 3.0)),
                     }
                 )
 
@@ -228,19 +305,20 @@ def main() -> None:
     for (purity, method), items in sorted(grouped.items(), key=lambda kv: (-kv[0][0], kv[0][1])):
         sads = np.array([x["mean_sad_deg"] for x in items], dtype=np.float64)
         rmses = np.array([x["rmse"] for x in items], dtype=np.float64)
-        succ5 = np.array([x["identifiable_5deg"] for x in items], dtype=np.float64)
+        succ_threshold = np.array([x["identifiable_at_threshold"] for x in items], dtype=np.float64)
         succ3 = np.array([x["identifiable_3deg"] for x in items], dtype=np.float64)
         ddof = 1 if len(items) > 1 else 0
         phase_rows.append(
             {
                 "purity_cap": purity,
                 "method": method,
+                "sad_success_threshold_deg": args.sad_success_deg,
                 "n_trials": len(items),
                 "mean_sad_mean_deg": float(np.mean(sads)),
                 "mean_sad_std_deg": float(np.std(sads, ddof=ddof)),
                 "rmse_mean": float(np.mean(rmses)),
                 "rmse_std": float(np.std(rmses, ddof=ddof)),
-                "success_rate_5deg": float(np.mean(succ5)),
+                "success_rate_at_threshold": float(np.mean(succ_threshold)),
                 "success_rate_3deg": float(np.mean(succ3)),
             }
         )
@@ -260,15 +338,19 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(phase_rows)
 
-    print("\n=== Synthetic Purity Phase Transition (Mean SAD & Success Rate <= 5 deg) ===")
-    print(f"{'Purity':>6} {'Method':<14} | {'Mean SAD (deg)':>17} | {'RMSE':>15} | {'Success(<=5°)':>13}")
+    print("\n=== Synthetic Purity Phase Transition (Success requires every endmember within threshold) ===")
+    success_label = f"All SAD <= {args.sad_success_deg:g} deg"
+    print(
+        f"{'Purity':>6} {'Method':<14} | {'Mean SAD (deg)':>17} | {'RMSE':>15} | "
+        f"{success_label:>18}"
+    )
     print("-" * 76)
     for r in phase_rows:
         print(
             f"{r['purity_cap']:>6.2f} {r['method']:<14} | "
             f"{r['mean_sad_mean_deg']:>6.2f} +/- {r['mean_sad_std_deg']:<6.2f} | "
             f"{r['rmse_mean']:>6.4f} +/- {r['rmse_std']:<6.4f} | "
-            f"{100.0 * r['success_rate_5deg']:>11.1f}%"
+            f"{100.0 * r['success_rate_at_threshold']:>14.1f}%"
         )
 
     print(f"\nSaved per-trial CSV:        {trial_csv}")

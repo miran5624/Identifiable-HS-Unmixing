@@ -77,6 +77,7 @@ def evaluate_file(
         "warmup_epochs": warmup,
         "lambda_vol": lam,
         "seed": seed,
+        "negative_samples_clipped": settings.get("negative_samples_clipped"),
         "gt_layout": gt_layout if ds.gt_A is not None else "no_gt_A",
         "mean_sad_deg": mean_sad,
         "max_sad_deg": max_sad,
